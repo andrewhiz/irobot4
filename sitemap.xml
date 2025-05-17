@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>http://localhost:1313/irobot4/</loc>
+    <lastmod>2025-05-17T02:32:16-07:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/irobot4/posts/</loc>
+    <lastmod>2025-05-17T02:32:16-07:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/irobot4/posts/visabuletrend/</loc>
+    <lastmod>2025-05-17T02:32:16-07:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/irobot4/categories/</loc>
+  </url><url>
+    <loc>http://localhost:1313/irobot4/tags/</loc>
+  </url>
+</urlset>
