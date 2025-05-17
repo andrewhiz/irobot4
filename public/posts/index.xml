@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Posts on Irobot4</title>
+    <link>http://localhost:1313/irobot4/posts/</link>
+    <description>Recent content in Posts on Irobot4</description>
+    <generator>Hugo -- 0.147.3</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 17 May 2025 02:32:16 -0700</lastBuildDate>
+    <atom:link href="http://localhost:1313/irobot4/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Visabuletrend</title>
+      <link>http://localhost:1313/irobot4/posts/visabuletrend/</link>
+      <pubDate>Sat, 17 May 2025 02:32:16 -0700</pubDate>
+      <guid>http://localhost:1313/irobot4/posts/visabuletrend/</guid>
+      <description>&lt;h1 id=&#34;heading-1&#34;&gt;Heading 1&lt;/h1&gt;</description>
+    </item>
+  </channel>
+</rss>
