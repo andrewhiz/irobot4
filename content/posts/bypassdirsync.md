@@ -1,151 +1,148 @@
+# 🔄 Why Mobile Numbers Aren't Syncing from AD to Entra ID
+
+> **TL;DR**: Your AD mobile numbers aren't appearing in Entra ID? It's likely that `BypassDirSyncOverridesEnabled` is not what you expect it to be.
+
 ---
-date: '2025-06-10T02:32:16-07:00'
-draft: false
-title: 'The Sync Gap'
+
+## 🚨 The Problem
+
+In hybrid Microsoft Entra ID environments, many admins are **surprised** to find that mobile numbers in Active Directory don't sync to Entra for some users — even though all other attributes do perfectly. You also don't see any signs of failure on Entra Connect log.
+
+**What you see:**
+```
+Active Directory          Entra ID
+┌─────────────────┐      ┌─────────────────┐
+│ 📱 +1234567890  │ ───► │ 📱 +1219999999  │
+│ 👤 John Doe     │ ───► │ 👤 John Doe     │ ✅
+│ 📧 john@co.com  │ ───► │ 📧 john@co.com  │ ✅
+└─────────────────┘      └─────────────────┘
+```
+
+**The Impact:**
+- 🔐 **MFA setup fails** (no mobile number)
+- 🔒 **SSPR doesn't work** (missing recovery method)  
+- 📞 **Teams contact data incomplete**
+
 ---
 
-# BypassDirSyncOverridesEnabled: Why Mobile Numbers Aren't Syncing from Active Directory to Entra ID
+## 🧠 Root Cause: BypassDirSyncOverridesEnabled (or is it)
 
-## The Unexpected (or expected) Sync Gap
+The culprit is a tenant setting called **`BypassDirSyncOverridesEnabled`**:
 
-In hybrid Microsoft Entra ID environments, administrators often encounter a puzzling scenario: mobile phone numbers populated in on-premises Active Directory are not synchronizing to Entra ID, despite other user attributes syncing correctly. Users appear in Entra ID with blank mobile phone fields, even though the `mobile` and `otherMobile` attributes are properly populated in their on-premises AD accounts.
+| Setting Value | Behavior |
+|---------------|----------|
+| `false` (default) | 🚫 **Blocks** AD mobile sync - Entra keeps cloud values |
+| `True` | ✅ **Allows** AD mobile sync - Traditional behavior |
 
-The root cause of this synchronization gap is a tenant setting called `BypassDirSyncOverridesEnabled`. When this setting is enabled (which it often is by default in newer tenants), it prevents the mobile phone attributes from syncing from on-premises Active Directory to Entra ID, breaking the expected synchronization flow.
+This setting specifically impacts:
+- 📱 `mobile` → `MobilePhone`
+- 📱 `otherMobile` → `AlternateMobilePhones`
 
-## Understanding the Logic Behind the Setting
 
-Microsoft introduced `BypassDirSyncOverridesEnabled` as part of their strategy to allow cloud-based updates to certain user attributes in hybrid environments. However, this creates an unintended consequence: when enabled, the system assumes mobile phone numbers should be managed from the cloud rather than synchronized from on-premises AD.
+---
 
-The setting affects these specific attributes:
-- **Mobile phone** (mobile attribute in AD)
-- **Alternate mobile phone** (otherMobile attribute in AD)
+## 📅 When Did This Change?
 
-## The Evolution of Mobile Number Management
+Prior to mid-2023, Entra ID allowed cloud updates to certain contact fields (like Mobile) for hybrid users. Users were were bale to update on their my profile page on Entra and Admins were also update. These changes were only updated on their Entra ID User object.
 
-Throughout 2023 and early 2024, Microsoft gradually introduced the capability for users and administrators to update mobile phone numbers directly in Entra ID for synchronized users. This was designed to provide flexibility without requiring changes to on-premises Active Directory. However, this feature came with the `BypassDirSyncOverridesEnabled` setting enabled by default in many tenants, effectively blocking the traditional AD-to-Entra sync for mobile attributes.
+Later, Microsoft introduced `BypassDirSyncOverridesEnabled` setting with-in Entra Connect, that allows organization to control this behavior. 
 
-## Why Administrators Are Caught Off Guard
+**Why admins are caught off-guard:**
+- 🤐 **Silent rollout** - No widespread communication
+- 🔍 **PowerShell-only** - Not visible in admin portals  
+- 🎯 **Selective blocking** - Only mobile attributes affected
+- ❌ **No error messages** - Sync appears to work fine
 
-Many administrators remain unaware of this behavior change for several reasons:
+---
 
-- **Silent implementation**: Microsoft didn't widely communicate this change in synchronization behavior
-- **Inconsistent defaults**: Some tenants have the setting enabled by default, others don't
-- **Hidden configuration**: The setting is only accessible via PowerShell, not through admin portals
-- **Selective blocking**: Only mobile phone attributes are affected, while other attributes sync normally
-- **No error messages**: Directory synchronization appears to work correctly overall
+## The REAL issue IMO
+*No issues logged on Entra Connect.*
 
-## Checking the Current Status
+The biggest issue with this setting is that you may see that mobile number fields are updating from Local AD to Entra, for most users. And you may see it not updating for some users. But you will NOT see any issues or any trace of it on your Entra Connect SYNC log.
 
-To verify if your tenant has this setting enabled (and thus blocking mobile sync from AD), use the Microsoft Graph PowerShell module:
+It is also confusing that you will see your accounts sync the mobile field, even when the `BypassDirSyncOverridesEnabled` setting is set to FALSE.
+
+If you are a traditional organization on hybrid, where you still consider Local AD as your "sourece of truth", you want to ensure that Local AD values are synced to Entra ID. If that is the case, you probably want this setting to be Enabled, so you could continue to sync mobile number values from Local AD to Entra.
+
+## Solution
+1. Status Check > Identify the current status of `BypassDirSyncOverridesEnabled`
+2. Evaluate the difference > Identify the user objects that has a different value (there is a command for that). This is in the event if you need to capture that data to be updated to Local AD.
+3. The Fix > Enable the `BypassDirSyncOverridesEnabled` set to TRUE
+4. Sync > Perform a Full Entra Connect Sync
+
+  
+
+## 🔍 1. Status Check
 
 ```powershell
 # Connect to Microsoft Graph
 Connect-MgGraph -Scopes "Directory.Read.All"
 
-# Get the Directory Feature Settings template
-$template = Get-MgDirectorySettingTemplate | Where-Object {$_.DisplayName -eq "Directory Feature Settings"}
+# Ensure to install ADSyncTools Module
+Install-Module ADSyncTools
 
-# Check if settings exist for this template
-$setting = Get-MgDirectorySetting | Where-Object {$_.TemplateId -eq $template.Id}
-
-if ($setting) {
-    $bypassSetting = $setting.Values | Where-Object {$_.Name -eq "BypassDirSyncOverridesEnabled"}
-    Write-Host "BypassDirSyncOverridesEnabled: $($bypassSetting.Value)"
-} else {
-    Write-Host "Directory Feature Settings not configured - using defaults"
-}
+# Check current status
+(Get-MgDirectoryOnPremiseSynchronization).Features.BypassDirSyncOverridesEnabled
 ```
 
-If the value shows `true`, mobile numbers won't sync from AD to Entra ID.
+**Result:**
+- `True` = 🚫 Mobile sync blocked
+- `False` = ✅ Mobile sync enabled
 
-## Generating a Gap Analysis Report
+---
 
-To identify users where mobile numbers exist in AD but are missing in Entra ID:
+## 📊 2. Evaluate the difference
+
+Find users that have different mobile numbers between Loca AD vs EntraID, using the ADSyncTools Module
 
 ```powershell
-# Get all synchronized users from Entra ID
-$entraUsers = Get-MgUser -All -Property UserPrincipalName,MobilePhone,OnPremisesSyncEnabled | 
-    Where-Object {$_.OnPremisesSyncEnabled -eq $true}
-
-# Create gap analysis report
-$gapReport = @()
-
-foreach ($user in $entraUsers) {
-    # Get corresponding on-premises user (requires AD PowerShell module)
-    $onPremUser = Get-ADUser -Filter "UserPrincipalName -eq '$($user.UserPrincipalName)'" -Properties mobile,otherMobile -ErrorAction SilentlyContinue
-    
-    if ($onPremUser) {
-        # Check for mobile number gaps
-        if (($onPremUser.mobile -and !$user.MobilePhone) -or 
-            ($onPremUser.mobile -ne $user.MobilePhone)) {
-            
-            $gapReport += [PSCustomObject]@{
-                UserPrincipalName = $user.UserPrincipalName
-                ADMobile = $onPremUser.mobile
-                ADOtherMobile = $onPremUser.otherMobile
-                EntraIDMobile = $user.MobilePhone
-                SyncGap = if ($onPremUser.mobile -and !$user.MobilePhone) { "Missing in Entra" } else { "Value Mismatch" }
-            }
-        }
-    }
-}
-
-# Export gap analysis
-$gapReport | Export-Csv -Path "MobileSyncGapAnalysis.csv" -NoTypeInformation
-Write-Host "Found $($gapReport.Count) users with mobile number sync gaps"
+# Get sync gaps between AD and Entra ID
+Compare-ADSyncToolsDirSyncOverrides
 ```
 
-## Disabling BypassDirSyncOverridesEnabled to Restore AD Sync
+---
 
-To restore normal synchronization of mobile numbers from Active Directory to Entra ID:
+## ⚡ 3. The Fix
+
+To restore traditional mobile number synchronization:
 
 ```powershell
 # Connect with write permissions
 Connect-MgGraph -Scopes "Directory.ReadWrite.All"
 
-# Get the directory settings template
-$template = Get-MgDirectorySettingTemplate | Where-Object {$_.DisplayName -eq "Directory Feature Settings"}
+# Disable the bypass (enable AD sync)
+$directorySynchronization = Get-MgDirectoryOnPremiseSynchronization
+$directorySynchronization.Features.BypassDirSyncOverridesEnabled = $true
+Update-MgDirectoryOnPremiseSynchronization -OnPremisesDirectorySynchronizationId $directorySynchronization.Id -Features $directorySynchronization.Features
 
-# Check if setting already exists
-$setting = Get-MgDirectorySetting | Where-Object {$_.TemplateId -eq $template.Id}
-
-if ($setting) {
-    # Update existing setting to disable bypass
-    $bypassSetting = $setting.Values | Where-Object {$_.Name -eq "BypassDirSyncOverridesEnabled"}
-    if ($bypassSetting) {
-        $bypassSetting.Value = "false"
-        Update-MgDirectorySetting -DirectorySettingId $setting.Id -BodyParameter $setting
-        Write-Host "BypassDirSyncOverridesEnabled disabled - mobile numbers will now sync from AD"
-    }
-} else {
-    # Create new setting with bypass disabled
-    $values = @()
-    $template.SettingTemplateValues | ForEach-Object {
-        if ($_.Name -eq "BypassDirSyncOverridesEnabled") {
-            $values += @{Name = $_.Name; Value = "false"}
-        } else {
-            $values += @{Name = $_.Name; Value = $_.DefaultValue}
-        }
-    }
-    
-    $newSetting = @{
-        TemplateId = $template.Id
-        Values = $values
-    }
-    
-    New-MgDirectorySetting -BodyParameter $newSetting
-    Write-Host "Directory Feature Settings created with BypassDirSyncOverridesEnabled disabled"
-}
 ```
 
-## Important Considerations After Disabling
+## 🔄 4. Sync
+Start a Full Sync cycle in MS Entra Connect (on your AD Connect server)
 
-- **Sync timing**: Changes take effect immediately, but the next directory synchronization cycle (typically 30 minutes) is required to populate mobile numbers from AD
-- **Manual sync**: Use `Start-ADSyncSyncCycle -PolicyType Delta` to trigger immediate synchronization
-- **Cloud changes lost**: Any mobile numbers manually entered in Entra ID will be overwritten by AD values
-- **Ongoing management**: Mobile numbers must now be managed in on-premises Active Directory
-- **Audit logs**: The configuration change and subsequent sync updates are logged in Entra ID audit logs
+```powershell
+Start-ADSyncSyncCycle -PolicyType Initial
 
-## Recommended Approach
+```
 
-For organizations expecting traditional directory synchronization behavior, disabling `BypassDirSyncOverridesEnabled` is typically the correct solution. This restores the expected flow where mobile phone attributes are managed in Active Directory and automatically synchronized to Entra ID, maintaining consistency with other synchronized user attributes.
+---
+
+## ⚠️ Important Considerations
+
+| ✅ Pros | ⚠️ Considerations |
+|---------|-------------------|
+| Mobile numbers sync from AD | Cloud-edited mobile numbers will be overwritten |
+| Consistent with other attributes | Must manage mobile numbers in Local AD |
+| Resolves MFA/SSPR issues | Changes are logged in audit logs |
+
+---
+
+## 📚 Official Microsoft Resources
+
+- **Primary Documentation**: [How to use the BypassDirSyncOverridesEnabled feature](https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/how-to-bypassdirsyncoverrides)
+- **Attribute Mapping**: [Attributes synchronized by Microsoft Entra Connect](https://learn.microsoft.com/en-us/entra/identity/hybrid/connect/reference-connect-sync-attributes-synchronized)  
+- **Graph API Reference**: [onPremisesDirectorySynchronizationFeature resource](https://learn.microsoft.com/en-us/graph/api/resources/onpremisesdirectorysynchronizationfeature)
+
+---
+
+**🎯 Bottom Line**: If your organization expects AD to be the source of truth for mobile numbers, set `BypassDirSyncOverridesEnabled` to TRUE, to restore traditional sync behavior.
