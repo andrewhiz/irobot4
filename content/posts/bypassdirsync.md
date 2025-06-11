@@ -1,3 +1,9 @@
+---
+date: '2025-06-10T02:32:16-07:00'
+draft: false
+title: 'The Sync Gap'
+---
+
 # 🔄 Why Mobile Numbers Aren't Syncing from AD to Entra ID
 
 > **TL;DR**: Your AD mobile numbers aren't updating in Entra ID Hybrid environment? It's likely that `BypassDirSyncOverridesEnabled` is not what you expect it to be.
