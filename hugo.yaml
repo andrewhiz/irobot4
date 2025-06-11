@@ -1,6 +1,6 @@
 baseURL: http://iam.onthejourney.online/
 languageCode: en-us
-title: IAM_onthejourney
+title: IAM onthejourney
 theme: ["PaperMod"]
 caches:
   images:
