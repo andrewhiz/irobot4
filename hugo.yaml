@@ -1,6 +1,6 @@
-baseURL: http://localhost:1313/irobot4/
+baseURL: http://iam.onthejourney.online/
 languageCode: en-us
-title: Irobot4
+title: IAM_onthejourney
 theme: ["PaperMod"]
 caches:
   images:
